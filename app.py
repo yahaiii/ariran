@@ -16,6 +16,12 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import base64
+import tempfile
+import psutil
+
+def get_base64_encoded_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 # Set page configuration
 st.set_page_config(
@@ -204,7 +210,8 @@ def process_and_predict(uploaded_file, model, device, model_type):
         progress_bar.progress(20)
         
         # Save uploaded file temporarily
-        file_path = os.path.join("/tmp", uploaded_file.name)
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
@@ -600,19 +607,21 @@ def main():
         # Determine input channels
         determined_input_channels = None
         try:
-            file_path_temp = os.path.join("/tmp", uploaded_file.name)
-            with open(file_path_temp, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            with rasterio.open(file_path_temp) as src:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.tif') as temp_file:
+                temp_file.write(uploaded_file.getvalue())
+                temp_file_path = temp_file.name
+
+            with rasterio.open(temp_file_path) as src:
                 determined_input_channels = src.count
             
             st.info(f"📊 Detected {determined_input_channels} spectral bands")
-            os.remove(file_path_temp)
             
         except Exception as e:
             st.error(f"❌ Error reading file: {e}")
             determined_input_channels = None
+        finally:
+            if 'temp_file_path' in locals():
+                os.remove(temp_file_path)
         
         if determined_input_channels is not None:
             # Load model
@@ -726,8 +735,8 @@ def main():
                     
                     with col1:
                         # Create download button for binary mask
-                        mask_pil = Image.fromarray(predicted_mask * 255)
-                        st.download_button(
+                            mask_pil = Image.fromarray(predicted_mask * 255)
+                            st.download_button(
                             label="📥 Download Binary Mask",
                             data=mask_pil.tobytes(),
                             file_name=f"flood_mask_{model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
@@ -831,7 +840,7 @@ def main():
         st.markdown("## 📊 Data Access")
         st.info("""
         💡 **Tip**: Download sample Sentinel-1 and Sentinel-2 data from:
-        - [Copernicus Open Access Hub](https9://scihub.copernicus.eu/)
+        - [Copernicus Open Access Hub](https://scihub.copernicus.eu/)
         - [USGS Earth Explorer](https://earthexplorer.usgs.gov/)
         - [Google Earth Engine](https://earthengine.google.com/)
         """)
@@ -896,11 +905,5 @@ def main():
         st.write(f"**System Memory**: {memory_usage.percent}% used")
         st.write(f"**Available Memory**: {memory_usage.available // 1024**2} MB")
 
-def get_base64_encoded_image(image_file):
-    with open(image_file, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    return encoded_string
-
-# Application entry point
 if __name__ == "__main__":
-    main()
+        main()
