@@ -1,0 +1,10 @@
+numpy
+Pillow
+plotly
+streamlit
+torch
+segmentation_models_pytorch
+rasterio
+matplotlib
+streamlit_lottie
+requests

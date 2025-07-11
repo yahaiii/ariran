@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual Environment
+venv/
+env/
+*.venv
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Model files (if they're large, you might want to ignore them)
+*.pth
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Logs
+*.log
