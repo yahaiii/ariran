@@ -1,0 +1,16 @@
+services:
+  workspace:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/ariran:cached
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ariran
+      DB_USER: ariran_pipeline
+      DB_PASSWORD: changeme_dev
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"

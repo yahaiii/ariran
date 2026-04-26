@@ -8,6 +8,7 @@ ACLED requires free registration for API key + email.
 Register at: https://acleddata.com/register/
 """
 
+import argparse
 from collections.abc import Iterator
 from datetime import date, timedelta
 from typing import Any
@@ -139,3 +140,32 @@ class ACLEDConnector(BaseConnector):
             "raw_payload": event,
             "raw_text": raw_text,
         }
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run ACLED connector")
+    parser.add_argument(
+        "--date-from",
+        dest="date_from",
+        default=None,
+        help="Start date in YYYY-MM-DD format",
+    )
+    parser.add_argument(
+        "--date-to",
+        dest="date_to",
+        default=None,
+        help="End date in YYYY-MM-DD format",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = _parse_args()
+    connector = ACLEDConnector(date_from=args.date_from, date_to=args.date_to)
+    summary = connector.run()
+    print(f"ACLED connector run complete: {summary}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

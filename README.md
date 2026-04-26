@@ -40,6 +40,27 @@ code .
 ```
 Install recommended extensions when prompted (`.vscode/extensions.json`).
 
+## VS Code Server / Remote Setup
+
+This repository now includes a Dev Container setup for VS Code Server usage.
+
+### Option A: WSL Remote (fastest)
+1. Open the project in WSL from VS Code.
+2. Run `make install` to create `.venv` and install dependencies.
+3. Run `make dev-up` and `make init-db`.
+
+### Option B: Dev Container (isolated)
+1. Open the project in VS Code.
+2. Run `Dev Containers: Reopen in Container`.
+3. Wait for `postCreateCommand` to finish creating `.venv` and installing dependencies.
+4. Use VS Code Tasks for bootstrap:
+	- `Install Dependencies`
+	- `Start DB Stack`
+	- `Initialize Database`
+
+The Dev Container config is defined in `.devcontainer/devcontainer.json` and shares
+the project `docker-compose.yml` database service.
+
 ## Project Structure
 ```
 ariran/
@@ -59,13 +80,13 @@ ariran/
 │   ├── models/          # SQLAlchemy ORM models (optional, raw SQL preferred)
 │   └── migrations/      # Alembic migration scripts
 ├── pipeline/
-│   ├── promote.py       # Staging → canonical promotion logic
+│   ├── promote.py       # Staging → canonical promotion logic (scaffold)
 │   ├── dags/            # Airflow DAG definitions
 │   └── operators/       # Custom Airflow operators
 ├── api/                 # FastAPI public REST API (Phase 2)
 ├── scripts/
 │   ├── init_db.py       # DB health check + seed verification
-│   └── load_boundaries.py  # Load OSGOF LGA boundary shapefiles
+│   └── load_boundaries.py  # Boundary loader entrypoint (scaffold)
 ├── tests/
 │   ├── unit/            # Connector + enrichment unit tests
 │   └── integration/     # Full pipeline end-to-end tests

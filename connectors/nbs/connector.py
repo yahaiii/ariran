@@ -6,12 +6,11 @@ Format: Excel (.xlsx), annual releases, state-level aggregates
 NBS data is structured (not scraped), so no NLP needed.
 Records are promoted directly with high confidence.
 """
-import re
+import argparse
 from pathlib import Path
-from typing import Iterator, Any
+from typing import Iterator, Any, TypedDict
 
 import pandas as pd
-import requests
 import structlog
 
 from connectors.base import BaseConnector
@@ -38,6 +37,13 @@ COLUMN_ALIASES = {
 }
 
 
+class NBSFileSource(TypedDict):
+    path: str
+    year: int
+    doc_id: str
+    url: str
+
+
 class NBSConnector(BaseConnector):
     """
     Ingests NBS annual crime statistics Excel files.
@@ -52,21 +58,28 @@ class NBSConnector(BaseConnector):
         self.year = year
 
     def fetch(self) -> Iterator[dict[str, Any]]:
-        sources = []
+        local_file = self.local_file
+        local_year = self.year
 
-        if self.local_file:
-            sources.append({"path": self.local_file, "year": self.year, "doc_id": "LOCAL"})
-        else:
-            sources = self._download_known_files()
+        if local_file:
+            if local_year is None:
+                raise ValueError("--year is required when --local-file is used")
 
-        for src in sources:
-            log.info("nbs_processing_file", path=src["path"], year=src["year"])
-            yield from self._parse_excel(src["path"], src["year"], src["doc_id"])
+            log.info("nbs_processing_file", path=local_file, year=local_year)
+            yield from self._parse_excel(local_file, local_year, "LOCAL")
+            return
+
+        for src in self._download_known_files():
+            path = src["path"]
+            year = src["year"]
+            doc_id = src["doc_id"]
+            log.info("nbs_processing_file", path=path, year=year)
+            yield from self._parse_excel(path, year, doc_id)
 
     # ------------------------------------------------------------------
 
-    def _download_known_files(self) -> list[dict]:
-        results = []
+    def _download_known_files(self) -> list[NBSFileSource]:
+        results: list[NBSFileSource] = []
         for entry in NBS_KNOWN_URLS:
             try:
                 resp = self._get_with_retry(entry["url"])
@@ -141,3 +154,32 @@ class NBSConnector(BaseConnector):
                     rename[col] = canonical
                     break
         return df.rename(columns=rename)
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run NBS connector")
+    parser.add_argument(
+        "--local-file",
+        dest="local_file",
+        default=None,
+        help="Path to a local NBS Excel file (.xlsx)",
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        help="Year for local file metadata",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = _parse_args()
+    connector = NBSConnector(local_file=args.local_file, year=args.year)
+    summary = connector.run()
+    print(f"NBS connector run complete: {summary}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
