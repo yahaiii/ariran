@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Environment
+.env
+*.env
+
+# VSCode
+.vscode/settings.json
+
+# Data
+data/
+*.csv
+*.xlsx
+*.shp
+*.dbf
+*.shx
+*.prj
+
+# Logs
+logs/
+*.log
+
+# Airflow
+airflow.db
+airflow.cfg
