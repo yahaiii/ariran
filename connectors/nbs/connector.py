@@ -3,12 +3,13 @@ NBS Connector — National Bureau of Statistics Annual Crime Statistics
 Source: https://nigerianstat.gov.ng
 Format: Excel (.xlsx), annual releases, state-level aggregates
 
-NBS data is structured (not scraped), so no NLP needed.
-Records are promoted directly with high confidence.
+Expansion strategy: one staging record per state per crime category.
+e.g. Abia 2017 → 4 rows: property_crime, violent_crime, lawful_authority, other
+This makes NBS data consistent with event-level sources for filtering and mapping.
 """
-import argparse
+import re
 from pathlib import Path
-from typing import Iterator, Any, TypedDict
+from typing import Iterator, Any
 
 import pandas as pd
 import structlog
@@ -17,69 +18,54 @@ from connectors.base import BaseConnector
 
 log = structlog.get_logger()
 
-# Known NBS crime statistics Excel URLs (extend as new reports are released)
 NBS_KNOWN_URLS = [
     {
         "url": "https://nigerianstat.gov.ng/resource/CRIME%20STATISTICS%202017.xlsx",
         "year": 2017,
         "doc_id": "NBS_CRIME_2017",
     },
-    # Add new annual URLs here as NBS publishes them
 ]
 
-# Column name normalisation map (NBS changes column names between years)
+# Map raw NBS column names → canonical crime category + ariran crime_type
+CATEGORY_MAP = {
+    "property_crime":                       ("property_crime",  "property_crime"),
+    "offences against property":            ("property_crime",  "property_crime"),
+    "offences against persons":             ("violent_crime",   "assault_and_violence"),
+    "offences against person":              ("violent_crime",   "assault_and_violence"),
+    "offences against lawful authority":    ("financial_crime", "offences_against_authority"),
+    "offences agains lawful authority":     ("financial_crime", "offences_against_authority"),
+    "other offences":                       ("other",           "other"),
+    "miscellaneous":                        ("other",           "other"),
+}
+
 COLUMN_ALIASES = {
-    "state": ["state", "states", "state name"],
-    "total_offences": ["total", "total offences", "total cases", "grand total"],
-    "violent_crime": ["violent crime", "offences against person", "against person"],
-    "property_crime": ["property crime", "offences against property", "against property"],
-    "year": ["year", "period"],
+    "state":            ["state", "states", "state name"],
+    "total_offences":   ["total", "total offences", "total cases", "grand total"],
+    "year":             ["year", "period"],
 }
 
 
-class NBSFileSource(TypedDict):
-    path: str
-    year: int
-    doc_id: str
-    url: str
-
-
 class NBSConnector(BaseConnector):
-    """
-    Ingests NBS annual crime statistics Excel files.
-    Each row in the Excel = one state/year aggregate record.
-    """
-
     source_code = "NBS_ANNUAL"
 
     def __init__(self, local_file: str | None = None, year: int | None = None):
         super().__init__()
-        self.local_file = local_file  # optional: path to already-downloaded file
+        self.local_file = local_file
         self.year = year
 
     def fetch(self) -> Iterator[dict[str, Any]]:
-        local_file = self.local_file
-        local_year = self.year
+        sources = []
+        if self.local_file:
+            sources.append({"path": self.local_file, "year": self.year, "doc_id": "LOCAL"})
+        else:
+            sources = self._download_known_files()
 
-        if local_file:
-            if local_year is None:
-                raise ValueError("--year is required when --local-file is used")
+        for src in sources:
+            log.info("nbs_processing_file", path=src["path"], year=src["year"])
+            yield from self._parse_excel(src["path"], src["year"], src["doc_id"])
 
-            log.info("nbs_processing_file", path=local_file, year=local_year)
-            yield from self._parse_excel(local_file, local_year, "LOCAL")
-            return
-
-        for src in self._download_known_files():
-            path = src["path"]
-            year = src["year"]
-            doc_id = src["doc_id"]
-            log.info("nbs_processing_file", path=path, year=year)
-            yield from self._parse_excel(path, year, doc_id)
-
-    # ------------------------------------------------------------------
-
-    def _download_known_files(self) -> list[NBSFileSource]:
-        results: list[NBSFileSource] = []
+    def _download_known_files(self) -> list[dict]:
+        results = []
         for entry in NBS_KNOWN_URLS:
             try:
                 resp = self._get_with_retry(entry["url"])
@@ -93,7 +79,6 @@ class NBSConnector(BaseConnector):
 
     def _parse_excel(self, path: str, year: int, doc_id: str) -> Iterator[dict]:
         try:
-            # Try all sheets; NBS sometimes puts data in non-default sheets
             xl = pd.ExcelFile(path)
             for sheet in xl.sheet_names:
                 df = xl.parse(sheet, header=None)
@@ -104,39 +89,75 @@ class NBSConnector(BaseConnector):
                 if "state" not in df.columns:
                     continue
 
+                # Identify crime category columns in this sheet
+                category_cols = self._detect_category_columns(df.columns)
+                if not category_cols:
+                    log.warning("nbs_no_category_cols", sheet=sheet)
+                    continue
+
                 for _, row in df.iterrows():
                     state = str(row.get("state", "")).strip()
                     if not state or state.lower() in ("state", "total", "nigeria", ""):
                         continue
 
-                    record_id = f"{doc_id}_{year}_{state.upper().replace(' ', '_')}"
-                    raw_payload = row.to_dict()
+                    total = row.get("total_offences")
 
-                    yield {
-                        "source_record_id": record_id,
-                        "source_url": next(
-                            (e["url"] for e in NBS_KNOWN_URLS if e["year"] == year), None
-                        ),
-                        "raw_payload": {
-                            "year": year,
-                            "sheet": sheet,
-                            "doc_id": doc_id,
-                            **{k: (v if pd.notna(v) else None)
-                               for k, v in raw_payload.items()},
-                        },
-                        "raw_text": (
-                            f"NBS {year} crime statistics for {state}. "
-                            f"Total offences: {row.get('total_offences', 'unknown')}. "
-                            f"Violent crime: {row.get('violent_crime', 'unknown')}. "
-                            f"Property crime: {row.get('property_crime', 'unknown')}."
-                        ),
-                    }
+                    # Expand: one record per crime category
+                    for raw_col, (crime_category, crime_type) in category_cols.items():
+                        count = row.get(raw_col)
+                        if pd.isna(count) or count is None:
+                            continue
+
+                        try:
+                            count = int(count)
+                        except (ValueError, TypeError):
+                            continue
+
+                        if count <= 0:
+                            continue
+
+                        record_id = (
+                            f"{doc_id}_{year}_{state.upper().replace(' ', '_')}"
+                            f"_{crime_type.upper()}"
+                        )
+
+                        yield {
+                            "source_record_id": record_id,
+                            "source_url": next(
+                                (e["url"] for e in NBS_KNOWN_URLS if e["year"] == year),
+                                None
+                            ),
+                            "raw_payload": {
+                                "year": year,
+                                "sheet": sheet,
+                                "doc_id": doc_id,
+                                "state": state,
+                                "crime_category": crime_category,
+                                "crime_type": crime_type,
+                                "offence_count": count,
+                                "total_offences": int(total) if pd.notna(total) else None,
+                            },
+                            "raw_text": (
+                                f"NBS {year} statistics for {state}: "
+                                f"{count} {crime_type.replace('_', ' ')} offences recorded."
+                            ),
+                        }
 
         except Exception as e:
             log.error("nbs_parse_failed", path=path, error=str(e))
 
+    def _detect_category_columns(self, columns) -> dict:
+        """Map actual DataFrame column names to (crime_category, crime_type) tuples."""
+        result = {}
+        for col in columns:
+            normalised = str(col).lower().strip()
+            # Remove trailing punctuation/spaces
+            normalised = re.sub(r'[^a-z\s]', '', normalised).strip()
+            if normalised in CATEGORY_MAP:
+                result[col] = CATEGORY_MAP[normalised]
+        return result
+
     def _find_and_set_header(self, df: pd.DataFrame) -> pd.DataFrame | None:
-        """Scan rows to find the actual header row (NBS embeds headers mid-sheet)."""
         for i, row in df.iterrows():
             values = [str(v).lower().strip() for v in row.values if pd.notna(v)]
             if any("state" in v for v in values):
@@ -146,7 +167,6 @@ class NBSConnector(BaseConnector):
         return None
 
     def _normalise_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Map variant NBS column names to canonical names."""
         rename = {}
         for canonical, aliases in COLUMN_ALIASES.items():
             for col in df.columns:
@@ -156,30 +176,7 @@ class NBSConnector(BaseConnector):
         return df.rename(columns=rename)
 
 
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run NBS connector")
-    parser.add_argument(
-        "--local-file",
-        dest="local_file",
-        default=None,
-        help="Path to a local NBS Excel file (.xlsx)",
-    )
-    parser.add_argument(
-        "--year",
-        type=int,
-        default=None,
-        help="Year for local file metadata",
-    )
-    return parser.parse_args()
-
-
-def main() -> int:
-    args = _parse_args()
-    connector = NBSConnector(local_file=args.local_file, year=args.year)
-    summary = connector.run()
-    print(f"NBS connector run complete: {summary}")
-    return 0
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    connector = NBSConnector()
+    result = connector.run()
+    print(f"NBS connector run complete: {result}")

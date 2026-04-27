@@ -1,31 +1,31 @@
 # Database
-psycopg2-binary==2.9.9
-sqlalchemy==2.0.30
-geoalchemy2==0.14.3
-alembic==1.13.1
+psycopg2-binary
+sqlalchemy>=1.4.36,<2.0
+geoalchemy2
+alembic
 
 # HTTP / scraping
-requests==2.31.0
-httpx==0.27.0
-feedparser==6.0.11
-beautifulsoup4==4.12.3
-lxml==5.2.1
+requests
+httpx
+feedparser
+beautifulsoup4
+lxml
 
 # NLP
-spacy==3.7.4
-transformers==4.40.1
+spacy
+transformers
 
 # Data processing
-pandas==2.2.2
-openpyxl==3.1.2
-python-dateutil==2.9.0
+pandas
+openpyxl
+python-dateutil
 
 # Pipeline orchestration
-apache-airflow==2.9.1
+apache-airflow
 
 # Config & utils
-pydantic==2.7.1
-pydantic-settings==2.2.1
-python-dotenv==1.0.1
-structlog==24.1.0
-tenacity==8.3.0
+pydantic>=2.0
+pydantic-settings
+python-dotenv
+structlog
+tenacity
