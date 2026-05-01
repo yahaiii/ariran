@@ -17,6 +17,7 @@ transformers
 
 # Data processing
 pandas
+geopandas
 openpyxl
 python-dateutil
 
