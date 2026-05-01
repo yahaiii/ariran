@@ -40,6 +40,11 @@ class _SessionForResolveStateFallback:
         return _FetchOneResult((99,))
 
 
+class _SessionForResolveNoMatch:
+    def execute(self, _sql, _params):
+        return _FetchOneResult(None)
+
+
 class _SessionForFindDuplicate:
     def __init__(self, row):
         self._row = row
@@ -75,6 +80,15 @@ def test_resolve_admin_boundary_falls_back_to_state() -> None:
 
     assert admin_id == 99
     assert precision == "state"
+
+
+def test_resolve_admin_boundary_returns_unknown_when_no_match() -> None:
+    session = _SessionForResolveNoMatch()
+
+    admin_id, precision = resolve_admin_boundary(session, "Unknown State", "Unknown LGA")
+
+    assert admin_id is None
+    assert precision == "unknown"
 
 
 def test_find_duplicate_uses_existing_canonical_id() -> None:
