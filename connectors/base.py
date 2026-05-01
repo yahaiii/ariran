@@ -2,17 +2,17 @@
 BaseConnector — all source connectors inherit from this.
 Enforces: run logging, staging insert, error handling, retry logic.
 """
-import uuid
 import json
+import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from db.connection import get_session
 from config.settings import settings
+from db.connection import get_session
 
 log = structlog.get_logger()
 

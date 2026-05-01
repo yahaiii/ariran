@@ -4,10 +4,12 @@ Usage:
     from db.connection import get_engine, get_session
 """
 from contextlib import contextmanager
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from config.settings import settings
+
 import structlog
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
+
+from config.settings import settings
 
 log = structlog.get_logger()
 

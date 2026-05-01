@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_name: str = "ariran"
     db_user: str = "ariran_pipeline"
-    db_password: str = Field(..., description="PostGIS DB password")
+    db_password: str = Field("", description="PostGIS DB password")
 
     @property
     def db_url(self) -> str:
@@ -51,4 +51,4 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]

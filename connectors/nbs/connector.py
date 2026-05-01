@@ -8,8 +8,9 @@ e.g. Abia 2017 → 4 rows: property_crime, violent_crime, lawful_authority, othe
 This makes NBS data consistent with event-level sources for filtering and mapping.
 """
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Any
+from typing import Any, TypedDict
 
 import pandas as pd
 import structlog
@@ -18,7 +19,21 @@ from connectors.base import BaseConnector
 
 log = structlog.get_logger()
 
-NBS_KNOWN_URLS = [
+
+class KnownNBSFile(TypedDict):
+    url: str
+    year: int
+    doc_id: str
+
+
+class NBSSource(TypedDict):
+    path: str
+    year: int
+    doc_id: str
+    url: str | None
+
+
+NBS_KNOWN_URLS: list[KnownNBSFile] = [
     {
         "url": "https://nigerianstat.gov.ng/resource/CRIME%20STATISTICS%202017.xlsx",
         "year": 2017,
@@ -54,9 +69,18 @@ class NBSConnector(BaseConnector):
         self.year = year
 
     def fetch(self) -> Iterator[dict[str, Any]]:
-        sources = []
+        sources: list[NBSSource] = []
         if self.local_file:
-            sources.append({"path": self.local_file, "year": self.year, "doc_id": "LOCAL"})
+            if self.year is None:
+                raise ValueError("year is required when local_file is provided")
+            sources.append(
+                {
+                    "path": self.local_file,
+                    "year": self.year,
+                    "doc_id": "LOCAL",
+                    "url": None,
+                }
+            )
         else:
             sources = self._download_known_files()
 
@@ -64,8 +88,8 @@ class NBSConnector(BaseConnector):
             log.info("nbs_processing_file", path=src["path"], year=src["year"])
             yield from self._parse_excel(src["path"], src["year"], src["doc_id"])
 
-    def _download_known_files(self) -> list[dict]:
-        results = []
+    def _download_known_files(self) -> list[NBSSource]:
+        results: list[NBSSource] = []
         for entry in NBS_KNOWN_URLS:
             try:
                 resp = self._get_with_retry(entry["url"])

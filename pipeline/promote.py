@@ -12,13 +12,12 @@ Flow per record:
 """
 import uuid
 from datetime import date
-from typing import Optional
 
 import structlog
 from sqlalchemy import text
 
-from db.connection import get_session
 from config.settings import settings
+from db.connection import get_session
 
 log = structlog.get_logger()
 
@@ -27,7 +26,7 @@ BATCH_SIZE = settings.staging_batch_size
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def resolve_admin_boundary(session, state: Optional[str], lga: Optional[str]) -> tuple:
+def resolve_admin_boundary(session, state: str | None, lga: str | None) -> tuple:
     """
     Returns (admin_boundary_id, geo_precision) by matching state/LGA
     against public.admin_boundaries.
@@ -57,8 +56,8 @@ def resolve_admin_boundary(session, state: Optional[str], lga: Optional[str]) ->
     return None, "unknown"
 
 
-def find_duplicate(session, event_date: Optional[date], admin_boundary_id: Optional[int],
-                   crime_type: Optional[str]) -> Optional[uuid.UUID]:
+def find_duplicate(session, event_date: date | None, admin_boundary_id: int | None,
+                   crime_type: str | None) -> uuid.UUID | None:
     """
     Simple dedup: same date + same LGA + same crime_type = likely duplicate.
     Returns canonical_id of existing record if found, else None.
@@ -82,7 +81,7 @@ def find_duplicate(session, event_date: Optional[date], admin_boundary_id: Optio
     return None
 
 
-def compute_confidence(session, source_id: int, nlp_confidence: Optional[float],
+def compute_confidence(session, source_id: int, nlp_confidence: float | None,
                        geo_precision: str, date_precision: str,
                        corroborating: int) -> float:
     """Calls the SQL function defined in the schema."""
@@ -146,13 +145,11 @@ def promote_batch(dry_run: bool = False) -> dict:
                 source_url      = row[4]
                 raw_payload     = row[5] or {}
                 nlp_crime_type  = row[7]
-                nlp_location    = row[8]
                 nlp_date_raw    = row[9]
                 nlp_actors      = row[10] or []
                 nlp_fatalities  = row[11]
                 nlp_injuries    = row[12]
                 nlp_confidence  = row[13]
-                geocoded_geom   = row[14]
                 geocoded_admin_id = row[15]
 
                 # ── Resolve location ───────────────────────────────────────
@@ -162,7 +159,7 @@ def promote_batch(dry_run: bool = False) -> dict:
                         or raw_payload.get("state_name"))
                 lga   = raw_payload.get("admin2") or raw_payload.get("lga_name")
 
-                
+
 
 
                 if geocoded_admin_id:
@@ -174,7 +171,7 @@ def promote_batch(dry_run: bool = False) -> dict:
                     )
                 if raw_payload.get("doc_id", "").startswith("NBS"):
                     geo_precision = "state"
-                
+
 
                 # ── Resolve date ───────────────────────────────────────────
                 event_date = None
@@ -263,7 +260,9 @@ def promote_batch(dry_run: bool = False) -> dict:
                             :perp_groups,
                             :narrative,
                             :source_id,
-                            ARRAY[:source_record_id], ARRAY[:source_url], ARRAY[:staging_id]::uuid[],
+                            ARRAY[:source_record_id],
+                            ARRAY[:source_url],
+                            ARRAY[:staging_id]::uuid[],
                             :corroborating,
                             :confidence, 'unverified',
                             :run_id
