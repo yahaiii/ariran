@@ -11,7 +11,6 @@ Run with: pytest tests/integration/ -v --tb=short
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -21,7 +20,6 @@ from config.settings import settings
 from db.connection import get_session
 from pipeline.promote import (
     compute_confidence,
-    find_duplicate,
     promote_batch,
     resolve_admin_boundary,
 )
@@ -287,7 +285,6 @@ class TestPromoteWorkflow:
     def test_promote_batch_success(self, session_fixture, setup_test_data):
         """Verify successful batch promotion."""
         session = session_fixture
-        test_data = setup_test_data
 
         # Get initial count
         before = session.execute(
@@ -315,7 +312,6 @@ class TestPromoteWorkflow:
     def test_promote_batch_dry_run(self, session_fixture, setup_test_data):
         """Verify dry-run doesn't commit changes."""
         session = session_fixture
-        test_data = setup_test_data
 
         # Get initial count
         before = session.execute(
@@ -341,7 +337,6 @@ class TestAuditTrail:
     def test_incident_audit_logged_on_insert(self, session_fixture, setup_test_data):
         """Verify insert is logged to audit table."""
         session = session_fixture
-        test_data = setup_test_data
 
         # Create and promote an incident
         promote_batch(dry_run=False)
