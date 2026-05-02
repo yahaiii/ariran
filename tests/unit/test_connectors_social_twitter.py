@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from connectors.social.twitter_connector import TwitterConnector
+from config import settings as settings_mod
 
 
 def _fake_twitter_resp(tweets_data, has_more=False):
@@ -24,6 +25,10 @@ def _fake_twitter_resp(tweets_data, has_more=False):
 
 
 def test_twitter_incremental(monkeypatch):
+    # Mock settings to have twitter_api_key
+    mock_settings = SimpleNamespace(twitter_api_key="fake_bearer_token_123")
+    monkeypatch.setattr(settings_mod, "settings", mock_settings)
+
     connector = TwitterConnector(keywords=["crime"])
 
     tweets = [
@@ -51,6 +56,10 @@ def test_twitter_incremental(monkeypatch):
 
 
 def test_twitter_backfill_pagination(monkeypatch):
+    # Mock settings to have twitter_api_key
+    mock_settings = SimpleNamespace(twitter_api_key="fake_bearer_token_123")
+    monkeypatch.setattr(settings_mod, "settings", mock_settings)
+
     connector = TwitterConnector(keywords=["crime"])
 
     page1_tweets = [
