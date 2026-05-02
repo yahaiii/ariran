@@ -30,6 +30,16 @@
       "justMyCode": false
     },
     {
+      "name": "Run API",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    },
+    {
       "name": "DB Health Check",
       "type": "debugpy",
       "request": "launch",

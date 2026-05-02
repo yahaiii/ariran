@@ -30,3 +30,5 @@ logs/
 # Airflow
 airflow.db
 airflow.cfg
+# Local-only project files
+PROJECT_ROADMAP.md

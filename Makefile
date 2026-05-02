@@ -1,4 +1,5 @@
 .PHONY: dev-up dev-down install test lint format check
+.PHONY: dev-up dev-down install test lint format check run-api
 
 # ── Environment ─────────────────────────────────────────────────────────
 install:
@@ -12,9 +13,18 @@ dev-up:
 	docker compose up -d
 	@echo "PostGIS ready at localhost:5432"
 	@echo "pgAdmin ready at http://localhost:5050"
+	@echo "API ready at http://localhost:8000 (if service built successfully)"
 
 dev-down:
 	docker compose down
+
+dev-up-api:
+	docker compose up -d api db pgadmin
+	@echo "Full stack ready:"
+	@echo "  - API:     http://localhost:8000"
+	@echo "  - Docs:    http://localhost:8000/docs"
+	@echo "  - pgAdmin: http://localhost:5050"
+	@echo "  - DB:      localhost:5432"
 
 db-reset:
 	docker compose down -v
@@ -33,6 +43,9 @@ run-nbs:
 
 run-acled:
 	.venv/bin/python -m connectors.acled.connector
+
+run-api:
+	.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 # ── Code quality ─────────────────────────────────────────────────────────
 lint:
@@ -55,3 +68,6 @@ test-unit:
 
 test-integration:
 	.venv/bin/pytest tests/integration -q
+
+test-integration-live:
+	INTEGRATION_TESTS=1 .venv/bin/pytest tests/integration -m live -q

@@ -22,19 +22,47 @@ cp .env.example .env          # fill in DB_PASSWORD, ACLED_API_KEY
 make install                  # creates .venv and installs all deps
 ```
 
-### 3. Start the database
+### 3. Start the database and stack
 ```bash
-make dev-up                   # starts PostGIS + pgAdmin via Docker
+make dev-up                   # starts PostGIS + pgAdmin + API via Docker
+```
+
+**Or**, run the database and run the API locally:
+```bash
+docker compose up -d db pgadmin  # database and admin UI only
+make init-db                  # verify connection and seed data
+make run-api                  # start the FastAPI app on http://localhost:8000
+```
+
+### 4. Initialize the database
+```bash
 make init-db                  # verifies connection and seed data
 ```
 
-### 4. Run connectors
+### 5. Run connectors
 ```bash
 make run-nbs                  # ingest NBS annual crime stats
 make run-acled                # ingest ACLED conflict events (needs API key)
 ```
 
-### 5. Open in VSCode
+### 6. Run integration tests
+```bash
+make test-integration         # run integration tests (live tests skip by default)
+INTEGRATION_TESTS=1 make test-integration-live
+```
+
+Live tests require real credentials and network access. The harness currently includes ACLED, RSS news, Nairaland, and Twitter when `TWITTER_API_KEY` is set.
+
+To run live integration tests in GitHub Actions, open the `Integration Tests` workflow and trigger it with `run_live_connectors=true`.
+Configure repository secrets: `ACLED_EMAIL`, `ACLED_PASSWORD`, `ACLED_API_KEY`, `TWITTER_API_KEY`.
+
+### 7. Access the API
+Once running, the API is available at:
+- **API**: http://localhost:8000
+- **Interactive Docs**: http://localhost:8000/docs
+- **OpenAPI Schema**: http://localhost:8000/openapi.json
+
+### 8. Open in VSCode
 ```bash
 code .
 ```
@@ -107,18 +135,18 @@ Every record carries:
 - `canonical_id` — links duplicate records from different sources to one event
 
 ## Sources
-| Code | Source | Type | Default Confidence |
-|------|--------|------|-------------------|
-| NBS_ANNUAL | National Bureau of Statistics | Government | 0.80 |
-| ACLED_API | ACLED Conflict Events | NGO | 0.78 |
-| NGA_WATCH | Nigeria Watch | NGO | 0.75 |
-| UCDP_GED | Uppsala Conflict Data Program | Academic | 0.80 |
-| PUNCH_RSS | Punch Newspapers | News | 0.55 |
-| VANGUARD_RSS | Vanguard | News | 0.55 |
-| CHANNELS_RSS | Channels TV | News | 0.60 |
-| PREMIUM_TIMES | Premium Times | News | 0.65 |
-| TWITTER_STREAM | X (Twitter) | Social | 0.30 |
-| CROWDSOURCE | ariran Tipline | Crowdsourced | 0.20 |
+| Code           | Source                        | Type         | Default Confidence |
+| -------------- | ----------------------------- | ------------ | ------------------ |
+| NBS_ANNUAL     | National Bureau of Statistics | Government   | 0.80               |
+| ACLED_API      | ACLED Conflict Events         | NGO          | 0.78               |
+| NGA_WATCH      | Nigeria Watch                 | NGO          | 0.75               |
+| UCDP_GED       | Uppsala Conflict Data Program | Academic     | 0.80               |
+| PUNCH_RSS      | Punch Newspapers              | News         | 0.55               |
+| VANGUARD_RSS   | Vanguard                      | News         | 0.55               |
+| CHANNELS_RSS   | Channels TV                   | News         | 0.60               |
+| PREMIUM_TIMES  | Premium Times                 | News         | 0.65               |
+| TWITTER_STREAM | X (Twitter)                   | Social       | 0.30               |
+| CROWDSOURCE    | ariran Tipline                | Crowdsourced | 0.20               |
 
 ## Contributing
 See `docs/CONTRIBUTING.md`. All contributions must include tests and pass `make check`.

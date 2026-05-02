@@ -177,8 +177,14 @@ class NBSConnector(BaseConnector):
             normalised = str(col).lower().strip()
             # Remove trailing punctuation/spaces
             normalised = re.sub(r'[^a-z\s]', '', normalised).strip()
-            if normalised in CATEGORY_MAP:
-                result[col] = CATEGORY_MAP[normalised]
+            # produce common variants to match CATEGORY_MAP keys which use
+            # a mix of spaces and underscores
+            norm_space = normalised
+            norm_underscore = normalised.replace(' ', '_')
+            if norm_underscore in CATEGORY_MAP:
+                result[col] = CATEGORY_MAP[norm_underscore]
+            elif norm_space in CATEGORY_MAP:
+                result[col] = CATEGORY_MAP[norm_space]
         return result
 
     def _find_and_set_header(self, df: pd.DataFrame) -> pd.DataFrame | None:

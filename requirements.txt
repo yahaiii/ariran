@@ -20,6 +20,8 @@ pandas
 geopandas
 openpyxl
 python-dateutil
+fastapi
+uvicorn[standard]
 
 # Pipeline orchestration
 apache-airflow

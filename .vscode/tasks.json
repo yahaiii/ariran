@@ -4,18 +4,21 @@
     {
       "label": "Install Dependencies",
       "type": "shell",
-      "command": "make install",
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make install"],
       "group": "build"
     },
     {
       "label": "Start DB Stack",
       "type": "shell",
-      "command": "make dev-up"
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make dev-up"]
     },
     {
       "label": "Initialize Database",
       "type": "shell",
-      "command": "make init-db",
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make init-db"],
       "dependsOn": [
         "Start DB Stack"
       ]
@@ -23,14 +26,23 @@
     {
       "label": "Run Unit Tests",
       "type": "shell",
-      "command": "make test-unit",
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make test-unit"],
       "group": "test"
     },
     {
       "label": "Run Lint + Type Check",
       "type": "shell",
-      "command": "make check",
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make check"],
       "group": "test"
+    },
+    {
+      "label": "Run API",
+      "type": "shell",
+      "command": "wsl",
+      "args": ["-e", "bash", "-lc", "cd /home/hp/projects/ariran && make run-api"],
+      "group": "build"
     }
   ]
 }

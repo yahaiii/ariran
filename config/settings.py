@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     # ACLED
     acled_api_key: str = ""
     acled_email: str = ""
-    acled_base_url: str = "https://api.acleddata.com/acled/read"
+    acled_password: str = ""
+    acled_base_url: str = "https://acleddata.com/api/acled/read"
+
+    # Social
+    twitter_api_key: str = ""
 
     # HTTP
     user_agent: str = "ariran-Bot/1.0"

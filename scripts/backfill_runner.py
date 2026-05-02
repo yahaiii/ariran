@@ -78,6 +78,7 @@ def run_backfill(
     batch_size: int = 500,
     dry_run: bool = False,
     checkpoint_enabled: bool = True,
+    mock: bool = False,
 ) -> dict:
     """
     Run backfill for a single connector.
@@ -109,6 +110,47 @@ def run_backfill(
         
         # Instantiate connector
         connector = connector_class()
+
+        # If mocking is requested, stub network calls for predictable local runs
+        if mock:
+            def _fake_resp(json_payload):
+                class FakeResp:
+                    def __init__(self, payload):
+                        self._payload = payload
+
+                    def json(self):
+                        return self._payload
+
+                return FakeResp(json_payload)
+
+            # Simple ACLED mock payload
+            if connector_name.startswith("acled"):
+                def fake_get(self, url, params=None, headers=None):
+                    sample = {
+                        "status": 200,
+                        "data": [
+                            {
+                                "event_id_cnty": "1001",
+                                "event_date": "2026-05-01",
+                                "event_type": "Violence against civilians",
+                                "actor1": "Group A",
+                                "actor2": "",
+                                "admin1": "Lagos",
+                                "admin2": "Ikeja",
+                                "notes": "Sample event for testing",
+                            },
+                        ],
+                    }
+                    return _fake_resp(sample)
+
+                connector._get_with_retry = fake_get.__get__(connector, connector.__class__)
+
+            else:
+                # Generic empty response for other connectors
+                def generic_fake(self, url, params=None, headers=None):
+                    return _fake_resp({"data": []})
+
+                connector._get_with_retry = generic_fake.__get__(connector, connector.__class__)
         
         # Override insert staging if dry run
         if dry_run:
@@ -196,6 +238,11 @@ def main():
         help="Disable checkpointing (full backfill each run)",
     )
     parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mocked HTTP responses for connectors (local testing)",
+    )
+    parser.add_argument(
         "--start-date",
         type=str,
         help="Start date for backfill (YYYY-MM-DD) - passed to connectors",
@@ -235,6 +282,7 @@ def main():
                 batch_size=args.batch_size,
                 dry_run=args.dry_run,
                 checkpoint_enabled=not args.no_checkpoint,
+                mock=args.mock,
             )
             results.append(result)
         except Exception as e:

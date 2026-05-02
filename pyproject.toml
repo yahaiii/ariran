@@ -13,6 +13,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+	"integration: tests that exercise the pipeline against real services or a real database",
+	"live: tests that hit live external services and require opt-in environment variables",
+]
 
 [tool.coverage.run]
 source = ["connectors", "enrichment", "db", "pipeline"]

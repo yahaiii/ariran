@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from connectors.acled import connector as acled_mod
 from connectors.acled.connector import ACLEDConnector
 
 
@@ -10,20 +9,33 @@ def _fake_resp(data, status=200):
     return SimpleNamespace(json=lambda: {"status": status, "data": data})
 
 
-def test_acled_incremental(monkeypatch):
+def _fake_token_resp():
+    return SimpleNamespace(json=lambda: {"access_token": "fake-token", "expires_in": 3600, "refresh_token": "fake-refresh", "token_type": "Bearer"})
+
+
+def test_acled_oauth_incremental(monkeypatch):
+    monkeypatch.setenv("ACLED_EMAIL", "test@example.com")
+    monkeypatch.setenv("ACLED_PASSWORD", "pw")
+
     connector = ACLEDConnector(date_from="2020-01-01", date_to="2020-01-02")
 
-    sample = [{"event_id_cnty": "e1", "event_type": "Violence", "actor1": "A", "actor2": "B", "notes": "note"}]
+    sample = [{"event_id_cnty": "e1", "event_type": "Violence"}]
 
-    monkeypatch.setattr(ACLEDConnector, "_get_with_retry", lambda self, url, params=None: _fake_resp(sample))
+    # Mock token request and authenticated GET
+    monkeypatch.setattr(ACLEDConnector, "_post_with_retry", lambda self, url, data: _fake_token_resp())
+    monkeypatch.setattr(ACLEDConnector, "_get_with_retry_auth", lambda self, url, params=None: _fake_resp(sample))
 
-    results = list(connector.fetch())
+    results = list(connector.fetch(mode="incremental"))
     assert len(results) == 1
     assert results[0]["source_record_id"].endswith("e1")
 
 
-def test_acled_backfill(monkeypatch):
+def test_acled_oauth_backfill(monkeypatch):
+    monkeypatch.setenv("ACLED_EMAIL", "test@example.com")
+    monkeypatch.setenv("ACLED_PASSWORD", "pw")
+
     # use small page size for test
+    from connectors.acled import connector as acled_mod
     monkeypatch.setattr(acled_mod, "ACLED_PAGE_SIZE", 2)
 
     page1 = [
@@ -44,7 +56,8 @@ def test_acled_backfill(monkeypatch):
             return _fake_resp(page2)
         return _fake_resp([])
 
-    monkeypatch.setattr(ACLEDConnector, "_get_with_retry", fake_get)
+    monkeypatch.setattr(ACLEDConnector, "_post_with_retry", lambda self, url, data: _fake_token_resp())
+    monkeypatch.setattr(ACLEDConnector, "_get_with_retry_auth", fake_get)
 
     connector = ACLEDConnector(date_from="2020-01-01", date_to="2020-12-31")
     results = list(connector.fetch())

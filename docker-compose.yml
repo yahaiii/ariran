@@ -34,5 +34,28 @@ services:
       db:
         condition: service_healthy
 
+  api:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    container_name: ariran_api
+    command: /bin/bash -c "pip install -q -r requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ariran
+      DB_USER: ariran_pipeline
+      DB_PASSWORD: ${DB_PASSWORD:-changeme_dev}
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - .:/app:cached
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   ariran_pgdata:
