@@ -35,13 +35,19 @@ class BaseConnector(ABC):
     # Public entry point
     # ------------------------------------------------------------------
 
-    def run(self) -> dict:
-        """Execute a full ingestion run. Returns run summary counters."""
-        log.info("connector_run_start", source=self.source_code)
+    def run(self, mode: str = "incremental") -> dict:
+        """Execute a full ingestion run.
+
+        mode: 'incremental' | 'backfill'
+
+        Returns run summary counters.
+        """
+        log.info("connector_run_start", source=self.source_code, mode=mode)
         self._run_id = self._open_pipeline_run()
 
         try:
-            for raw_record in self.fetch():
+            # Pass mode to fetch so connectors can implement backfill vs incremental
+            for raw_record in self.fetch(mode=mode):
                 self._counters["fetched"] += 1
                 try:
                     inserted = self._insert_staging(raw_record)
@@ -62,20 +68,20 @@ class BaseConnector(ABC):
         log.info("connector_run_done", source=self.source_code, **self._counters)
         return self._counters
 
-    # ------------------------------------------------------------------
-    # Abstract interface
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Abstract interface
+        # ------------------------------------------------------------------
 
-    @abstractmethod
-    def fetch(self) -> Iterator[dict[str, Any]]:
-        """
-        Yields one raw record dict per incident. Must include at minimum:
-          - source_record_id: str
-          - source_url: str (optional)
-          - raw_payload: dict  (the full original record)
-          - raw_text: str      (plain text for NLP)
-        """
-        ...
+        @abstractmethod
+        def fetch(self, mode: str = "incremental") -> Iterator[dict[str, Any]]:
+                """
+                Yields one raw record dict per incident. Must include at minimum:
+                    - source_record_id: str
+                    - source_url: str (optional)
+                    - raw_payload: dict  (the full original record)
+                    - raw_text: str      (plain text for NLP)
+                """
+                ...
 
     # ------------------------------------------------------------------
     # Internal helpers
