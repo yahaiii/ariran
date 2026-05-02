@@ -1,3 +1,71 @@
+from __future__ import annotations
+
+from typing import Iterator, Any
+
+from types import SimpleNamespace
+
+from connectors.base import BaseConnector
+
+
+class ACLEDConnector(BaseConnector):
+    """Simple ACLED connector example.
+
+    Configurable via `self.api_url` (defaults to ACLED events endpoint).
+    Supports `mode='incremental'` (single recent page) and `mode='backfill'` (page through offset).
+    """
+
+    source_code = "ACLED_API"
+
+    def __init__(self, api_url: str | None = None, page_size: int = 100):
+        super().__init__()
+        self.api_url = api_url or "https://api.acleddata.com/acled/read"
+        self.page_size = page_size
+
+    def fetch(self, mode: str = "incremental") -> Iterator[dict[str, Any]]:
+        params = {"limit": self.page_size, "offset": 0}
+
+        if mode == "incremental":
+            resp = self._get_with_retry(self.api_url, params=params)
+            data = resp.json().get("data", [])
+            for item in data:
+                yield self._item_to_record(item)
+            return
+
+        # backfill: iterate pages until fewer than page_size returned
+        while True:
+            resp = self._get_with_retry(self.api_url, params=params)
+            payload = resp.json()
+            data = payload.get("data", [])
+            if not data:
+                break
+            for item in data:
+                yield self._item_to_record(item)
+            if len(data) < self.page_size:
+                break
+            params["offset"] += self.page_size
+
+    def _item_to_record(self, item: dict) -> dict:
+        # Try common ACLED fields for an identifier
+        source_record_id = item.get("event_id") or item.get("id") or item.get("_id")
+        if source_record_id is None:
+            # fallback to composite
+            source_record_id = f"{item.get('event_date','')}_{item.get('actor1','')}_{item.get('actor2','')}"
+
+        raw_text = " ".join(str(item.get(k, "")) for k in ("event_type", "actor1", "actor2", "notes"))
+
+        return {
+            "source_record_id": str(source_record_id),
+            "source_url": None,
+            "raw_payload": item,
+            "raw_text": raw_text,
+        }
+
+
+if __name__ == "__main__":
+    c = ACLEDConnector()
+    print("Running ACLEDConnector (dry run)...")
+    summary = c.run(mode="incremental")
+    print(summary)
 """
 ACLED Connector — Armed Conflict Location & Event Data Project
 API docs: https://developer.acleddata.com
